@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
+import { parseAtlas } from "../../utils";
 
 interface IRect {
+    sx: number,
+    sy: number,
+    swidth: number,
+    sheight: number,
     x: number;
     y: number;
     width: number;
@@ -13,60 +18,46 @@ interface IPosition {
     y: number;
 }
 
-
 export default function Rally() {
-    const [score, setScore] = useState(0); // Очки игрока
+    console.log('render APP');
+    const [score, setScore] = useState(0);
+    const [roadImage, setScore] = useState(0);
+    // Очки игрока
+    const [gameArea, setGameArea] = useState<DOMRect>(() => DOMRect.fromRect());
+    const [sprites, setSprites] = useState<any>(null);
+
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const carRef = useRef<IRect | null>(null);
+    const obstacleRef = useRef<IRect>(null);
     const obstaclesRef = useRef<IRect[]>([]);
     const intervalRef = useRef<number | null>(null);
     const animationRef = useRef<number | null>(null);
-    const [canvasRect, setCanvasRect] = useState<DOMRect>(DOMRect.fromRect());
-    const scrollSpeed = 2; // Скорость прокрутки дороги
-    let roadImage: HTMLImageElement | null = null; // Текстура дороги
-    let roadOffset = 0; // Смещение текстуры дороги
-    const obstacleSpeed = 3; // Скорость падения препятствий
-    const canvasHeigth = 800;
     const containerRef = useRef<HTMLDivElement | null>(null);
+
+    const scrollSpeed = 2;
+    const obstacleSpeed = 3;
+    let roadImage: HTMLImageElement | null = null; // Текстура дороги
+    let roadOffset = 0; // ???
+    const canvasHeigth = 800;
+
 
     const loadRoadImage = () => {
         roadImage = new Image();
-        roadImage.src = "/road2.jpg"; // Укажите путь к вашему изображению дороги
+        roadImage.src = "/road2.jpg";
+
         roadImage.onload = () => {
-            console.log("Road image loaded.");
-        };
-    };
+            const canvas = canvasRef.current;
+            if (!canvas) return;
 
-    const drawCanvas = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) return;
 
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        // Рисуем дорогу
-        const patternHeight = canvasHeigth; // Высота текстуры дороги
-        const yPosition1 = roadOffset % patternHeight;
-        const yPosition2 = yPosition1 - patternHeight;
-
-        if (roadImage) {
-            ctx.drawImage(roadImage, 0, yPosition1, canvas.width, patternHeight);
-            ctx.drawImage(roadImage, 0, yPosition2, canvas.width, patternHeight);
-        }
-
-        // Рисуем машину
-        if (carRef.current) {
-            const { x, y, width, height, image } = carRef.current;
-            if (image) {
-                ctx.drawImage(image, x, y, width, height);
+            if (roadImage) {
+                ctx.drawImage(roadImage, 0, 0, gameArea.width, gameArea.height);
             }
         }
 
-        // Рисуем препятствия
-        obstaclesRef.current.forEach((obstacle) => {
-            ctx.fillStyle = "red";
-            ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
-        });
+        console.log('ROAD LOADED');
     };
 
     const moveObstacles = () => {
@@ -79,17 +70,17 @@ export default function Rally() {
                 return false;
             }
 
-            if (obstacle.y >= canvasRect.height) {
+            if (obstacle.y >= gameArea.height) {
                 setScore((prevScore) => prevScore + 100); // Добавляем очки за избегание препятствия
             }
-            return obstacle.y < canvasRect.height;
+            return obstacle.y < gameArea.height;
         });
     };
 
     const addObstacle = () => {
         const width = 100;
         const height = 20;
-        const x = Math.random() * (canvasRect.width - width);
+        const x = Math.random() * (gameArea.width - width);
         obstaclesRef.current.push({ x, y: 0, width, height });
     };
 
@@ -161,33 +152,123 @@ export default function Rally() {
         animationRef.current = requestAnimationFrame(animate);
     };
 
-    const handleStart = () => {
-        handleReset(); // Сбрасываем игру перед стартом
-        loadRoadImage();
+    const createObstacle = () => {
         const newImage = new Image();
-        newImage.src = "/car-white.svg"; // Укажите путь к изображению машины
+        newImage.src = "/cars.png";
+        newImage.onload = () => {
+            // Создаём временный canvas
+            const tempCanvas = document.createElement("canvas");
+            const ctx = tempCanvas.getContext("2d");
+
+            if (!ctx) return;
+
+            // Задаём размеры canvas и масштабируем
+            tempCanvas.width = 33; // Ширина области вырезки
+            tempCanvas.height = 69; // Высота области вырезки
+            ctx.scale(1, -1); // Отражение по вертикали
+            ctx.translate(0, -tempCanvas.height); // Корректируем позицию
+
+            // Вырезаем и отражаем спрайт
+            ctx.drawImage(newImage, 92, 185, 33, 69, 0, 0, 33, 69);
+
+            // Создаём новое изображение из временного canvas
+            const flippedImage = new Image();
+            flippedImage.src = tempCanvas.toDataURL();
+
+            // Сохраняем препятствие с перевёрнутым изображением
+            obstacleRef.current = {
+                sx: 0,
+                sy: 0,
+                swidth: 33,
+                sheight: 69,
+                x: 0,
+                y: 0,
+                width: 33,
+                height: 69,
+                image: flippedImage,
+            };
+        };
+    };
+
+    const handleStart = () => {
+        const newImage = new Image();
+        newImage.src = "/cars.png";
         newImage.onload = () => {
             carRef.current = {
-                x: canvasRect.width / 2 - 50,
-                y: canvasRect.height - 110,
+                sx: 179,
+                sy: 89,
+                swidth: 25,
+                sheight: 47,
+                x: gameArea.width / 2 - 50,
+                y: gameArea.height - 110,
                 width: 100,
                 height: 100,
                 image: newImage,
-            };
+            }
+            createObstacle();
             startAnimation();
         };
     };
 
+    const drawCanvas = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        // Рисуем дорогу
+        const patternHeight = canvasHeigth; // Высота текстуры дороги
+        const yPosition1 = roadOffset % patternHeight;
+        const yPosition2 = yPosition1 - patternHeight;
+
+        if (roadImage) {
+            console.log(yPosition1, yPosition2);
+            ctx.drawImage(roadImage, 0, yPosition1, canvas.width, patternHeight);
+            ctx.drawImage(roadImage, 0, yPosition2, canvas.width, patternHeight);
+        }
+
+        // Рисуем машину
+        if (carRef.current) {
+            const { image, sx, sy, swidth, sheight, x, y } = carRef.current;
+            if (image) {
+                ctx.drawImage(image, x, y, swidth * 2, sheight * 2);
+            }
+        }
+
+        // Рисуем препятствия
+        obstaclesRef.current.forEach((obstacle) => {
+            if (obstacleRef.current) {
+                const { image, sx, sy, swidth, sheight } = obstacleRef.current;
+                if (image) {
+                    ctx.drawImage(image, sx, sy, swidth, sheight, obstacle.x, obstacle.y, swidth * 2, sheight * 2);
+                }
+            }
+            // ctx.fillStyle = "red";
+            // ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            // ctx.drawImage(image, sx, sy, swidth, sheight, x, y, swidth * 2, sheight * 2)
+        });
+    };
+
+
     useEffect(() => {
         const canvas = canvasRef.current;
         if (canvas) {
-            setCanvasRect(canvas.getBoundingClientRect());
+            setGameArea(canvas.getBoundingClientRect());
         }
-        if (containerRef.current) {
-            containerRef.current.focus(); // Automatically focuses the div
+
+        const getSprites = async () => {
+            const sprites = await fetch('/cars.atlas');
+            const text = await sprites.text();
+            const parsedSprites = parseAtlas(text);
+            setSprites(parsedSprites);
+
         }
-        loadRoadImage();
+
+        getSprites();
     }, []);
+
+    useEffect(() => loadRoadImage(), [gameArea])
 
     return (
         <div
