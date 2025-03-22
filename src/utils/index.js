@@ -12,7 +12,7 @@ export const parseAtlas = (atlasContent) => {
     switch (line.split(':')[0]) {
       case line:
         if (spriteName) {
-          sprites.push({ [spriteName]: spriteContent });
+          sprites.push(spriteContent);
           spriteName = line;
           spriteContent = {};
           break;
@@ -32,7 +32,7 @@ export const parseAtlas = (atlasContent) => {
     }
   });
 
-  sprites.push({ spriteName: spriteContent });
+  sprites.push(spriteContent);
 
   return sprites;
 };
