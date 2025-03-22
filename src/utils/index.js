@@ -32,7 +32,5 @@ export const parseAtlas = (atlasContent) => {
     }
   });
 
-  sprites.push(spriteContent);
-
   return sprites;
 };

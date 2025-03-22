@@ -5,8 +5,7 @@ import Racing from './canvas';
 export default function Rally() {
   const [cars, setCars] = useState(null);
   const [sensivity, setSensivity] = useState(1);
-  const [playing, setPlaying] = useState(false);
-  const [score, setScore] = useState(0);
+  const [playState, setPlayState] = useState(false);
   const canvasContainerRef = useRef(null);
   const canvasInstance = useRef(null);
 
@@ -21,12 +20,10 @@ export default function Rally() {
 
   const handleStart = () => {
     canvasContainerRef.current.focus();
-    setPlaying(true);
     canvasInstance.current.startAnimation(sensivity);
   };
 
   const handleReset = () => {
-    setPlaying(false);
     canvasInstance.current.stopAnimation();
   };
 
@@ -70,8 +67,8 @@ export default function Rally() {
           size: { width: 400, height: 800 },
           selectedCar: { x: 1, y: 131, width: 54, height: 123 },
           carsImgUrl: '/cars.png',
-          setScore,
           carsCoords: coords,
+          setPlayState,
         });
 
         canvasContainerRef.current.appendChild(canvasInstance.current.init());
@@ -82,7 +79,6 @@ export default function Rally() {
 
   return (
     <div>
-      <div style={{ fontSize: 24, color: 'white' }}>Score: {}</div>
       <div
         style={{ outline: 'none' }}
         onKeyDown={handleKeyDown}
@@ -99,10 +95,10 @@ export default function Rally() {
         }}
       >
         <button
-          disabled={playing}
+          disabled={playState}
           style={{
-            pointerEvents: playing && 'none',
-            userSelect: playing && 'none',
+            pointerEvents: playState && 'none',
+            userSelect: playState && 'none',
           }}
           onClick={handleStart}
         >
@@ -115,7 +111,6 @@ export default function Rally() {
           Reset
         </button>
       </div>
-      <div>SCORE: {score}</div>
     </div>
   );
 }

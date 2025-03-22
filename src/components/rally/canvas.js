@@ -5,7 +5,7 @@ export default class Racing {
     carsImgUrl,
     carsCoords,
     selectedCar,
-    setScore,
+    setPlayState,
   }) {
     this.size = size;
     this.roadImgUrl = roadImgUrl;
@@ -15,14 +15,9 @@ export default class Racing {
     this.roadOffset = 0;
     this.scrollSpeed = 2;
     this.sensivity = 1;
-    this.setScore = setScore;
     this.obstacles = [];
     this.obstaclesSpeed = 1;
-
-    // this.drivingLeft = false;
-    // this.drivingRight = false;
-    // this.drivingUp = false;
-    // this.drivingDown = false;
+    this.setPlayState = setPlayState;
   }
 
   init() {
@@ -51,22 +46,29 @@ export default class Racing {
     };
 
     this.ctx = this.canvas.getContext('2d');
+
     this.initRoad();
     this.initCar();
 
     return this.canvas;
   }
 
-  initRoad() {
+  initRoad(gameOver) {
+    this.frameCount = 0;
+    this.time = 60;
     this.roadImage = new Image();
     this.roadImage.src = this.roadImgUrl;
 
     this.roadImage.onload = () => {
       console.log('ROAD LOADED');
       this.drawRoad();
+      if (gameOver) {
+        return this.gameOver();
+      }
+      this.score = 0;
     };
   }
-
+  //need to combine with init own car
   initObstacle() {
     const image = new Image();
     image.src = this.carsImgUrl;
@@ -79,7 +81,7 @@ export default class Racing {
       const tempCtx = tempCanvas.getContext('2d');
       const scaledWidth = currentCar.size.x * 2;
       const scaledHeight = currentCar.size.y * 2;
-      console.log(scaledHeight);
+
       tempCanvas.width = scaledWidth;
       tempCanvas.height = scaledHeight;
       tempCtx.save();
@@ -109,17 +111,60 @@ export default class Racing {
         dx: this.obstaclesSpeedPositionMap[random].dx,
         speed: this.obstaclesSpeedPositionMap[random].speed,
         dy: -scaledHeight,
+        width: scaledWidth,
+        height: scaledHeight,
       });
     };
   }
 
   drawObstacles() {
-    this.obstacles.forEach((car) => {
-      const { dx, image, speed } = car;
-      this.ctx.drawImage(image, dx, (car.dy += speed));
-    });
+    this.newObstacles = [];
+    for (let index = 0; index < this.obstacles.length; index++) {
+      const obstacle = this.obstacles[index];
+
+      if (obstacle.dy > this.canvas.height) {
+        continue;
+      }
+
+      const { dx, image, speed } = obstacle;
+      obstacle.dy += speed;
+      this.ctx.drawImage(image, dx, obstacle.dy);
+
+      if (this.isCollision(this.obstacles[index], this.car)) {
+        alert('GAME OVER');
+        this.stopAnimation('gameover');
+        break;
+      }
+
+      if (obstacle.dy > this.canvas.height) {
+        this.score += 100;
+      }
+
+      this.newObstacles.push(obstacle);
+    }
+
+    this.obstacles = this.newObstacles;
+
+    // this.obstacles.forEach((car) => {
+    //   const { dx, image, speed } = car;
+    //   this.ctx.drawImage(image, dx, (car.dy += speed));
+    //   if (this.isCollision(car, this.car)) {
+    //     alert('GAME OVER');
+    //     this.stopAnimation();
+    //   }
+    // });
+
+    // this.obstacles = this.obstacles.filter((car) => {
+    //   if (car.dy > this.canvas.height) {
+    //     this.score += 100;
+    //     return false;
+    //   }
+
+    //   return true;
+    // });
   }
 
+  //need to combine with initObstacle
   initCar() {
     const { x, y, width, height } = this.selectedCar;
     const image = new Image();
@@ -136,6 +181,15 @@ export default class Racing {
         dy: this.canvas.height - 10 - height,
       };
     };
+  }
+
+  isCollision(rect1, rect2) {
+    return (
+      rect1.dx < rect2.dx + rect2.width &&
+      rect1.dx + rect1.width > rect2.dx &&
+      rect1.dy < rect2.dy + rect2.height &&
+      rect1.dy + rect1.height > rect2.dy
+    );
   }
 
   drawRoad() {
@@ -183,45 +237,79 @@ export default class Racing {
   }
 
   updateRoad() {
-    this.roadOffset += this.scrollSpeed; // Move the road offset
+    this.frameCount++;
+    this.roadOffset += this.scrollSpeed;
     this.drawRoad();
     this.drawCar();
     this.drawObstacles();
+    this.ctx.font = '24px Arial';
+    this.ctx.fillStyle = 'white';
+
+    this.ctx.fillText(`Score: ${this.score}`, 50, 50);
+    this.ctx.fillText(`Time: ${this.time}`, 50, 100);
   }
 
   startAnimation(sensivity) {
+    this.playing = true;
+    this.setPlayState(true);
     if (sensivity) {
-      console.log(sensivity);
       this.sensivity = sensivity;
-    }
-    if (this.animationFrameId) {
-      this.stopAnimation();
     }
 
     const loop = () => {
-      this.updateRoad(); // Update the road position
-      this.animationFrameId = requestAnimationFrame(loop);
+      if (this.playing) {
+        this.updateRoad();
+        this.animationFrameId = requestAnimationFrame(loop);
+      }
     };
 
     this.interval = setInterval(() => {
       this.initObstacle();
     }, 2000);
 
-    loop();
+    this.timer = setInterval(() => {
+      this.time--;
+    }, 1000);
+
+    this.animationFrameId = requestAnimationFrame(loop);
   }
 
-  stopAnimation() {
+  gameOver() {
+    this.ctx.font = '50px Arial';
+    this.ctx.fillStyle = 'red';
+    this.ctx.textAlign = 'center'; // Horizontal center
+    this.ctx.textBaseline = 'middle'; // Vertical center
+    this.ctx.fillText(
+      'GAME OVER',
+      this.canvas.width / 2,
+      this.canvas.height / 2
+    );
+    this.ctx.fillStyle = 'white';
+    this.ctx.fillText(
+      `Score: ${this.score}`,
+      this.canvas.width / 2,
+      this.canvas.height / 2 + 100
+    );
+  }
+
+  stopAnimation(gameover) {
+    console.log('RESET');
+    this.playing = false;
+    this.setPlayState(false);
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
     }
     if (this.interval) {
       clearInterval(this.interval);
     }
+    if (this.timer) {
+      clearInterval(this.timer);
+    }
     this.animationFrameId = null;
     this.ctx.clearRect(0, 0, this.size.width, this.size.height);
 
     this.obstacles = [];
-    this.initRoad();
+    this.initRoad(gameover);
     this.initCar();
   }
 }
