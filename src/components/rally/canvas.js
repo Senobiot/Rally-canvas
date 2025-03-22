@@ -61,60 +61,78 @@ export default class Racing {
 
     this.roadImage.onload = () => {
       console.log('ROAD LOADED');
-      this.drawRoad();
+      // this.drawRoad();
       if (gameOver) {
         return this.gameOver();
       }
+      this.drawMenu();
       this.score = 0;
     };
   }
   //need to combine with init own car
-  initObstacle() {
-    const image = new Image();
-    image.src = this.carsImgUrl;
+
+  processCarSprite(car, scale) {
+    return new Promise((resolve) => {
+      const image = new Image();
+      image.src = this.carsImgUrl;
+
+      image.onload = () => {
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d');
+        const scaledWidth = car.size.x * 2;
+        const scaledHeight = car.size.y * 2;
+
+        tempCanvas.width = scaledWidth;
+        tempCanvas.height = scaledHeight;
+        tempCtx.save();
+
+        if (scale === 2 || scale === 1) {
+          tempCtx.scale(1, -1);
+          tempCtx.translate(0, -scaledHeight);
+        }
+
+        tempCtx.drawImage(
+          image,
+          car.xy.x,
+          car.xy.y,
+          car.size.x,
+          car.size.y,
+          0,
+          0,
+          scaledWidth,
+          scaledHeight
+        );
+
+        const flippedSprite = new Image();
+        flippedSprite.src = tempCanvas.toDataURL();
+
+        resolve({
+          image: flippedSprite,
+          width: scaledWidth,
+          height: scaledHeight,
+        });
+      };
+    });
+  }
+
+  async initObstacle() {
     const random = Math.floor(Math.random() * 4) + 1;
     const randomCar = Math.floor(Math.random() * this.carsCoords.length);
     const currentCar = this.carsCoords[randomCar];
 
-    image.onload = () => {
-      const tempCanvas = document.createElement('canvas');
-      const tempCtx = tempCanvas.getContext('2d');
-      const scaledWidth = currentCar.size.x * 2;
-      const scaledHeight = currentCar.size.y * 2;
+    const { image, width, height } = await this.processCarSprite(
+      currentCar,
+      random
+    );
 
-      tempCanvas.width = scaledWidth;
-      tempCanvas.height = scaledHeight;
-      tempCtx.save();
-
-      if (random === 2 || random === 1) {
-        tempCtx.scale(1, -1);
-        tempCtx.translate(0, -scaledHeight);
-      }
-
-      tempCtx.drawImage(
-        image,
-        currentCar.xy.x,
-        currentCar.xy.y,
-        currentCar.size.x,
-        currentCar.size.y,
-        0,
-        0,
-        scaledWidth,
-        scaledHeight
-      );
-
-      const flippedSprite = new Image();
-      flippedSprite.src = tempCanvas.toDataURL();
-
-      this.obstacles.push({
-        image: flippedSprite,
-        dx: this.obstaclesSpeedPositionMap[random].dx,
-        speed: this.obstaclesSpeedPositionMap[random].speed,
-        dy: -scaledHeight,
-        width: scaledWidth,
-        height: scaledHeight,
-      });
-    };
+    this.obstacles.push({
+      image,
+      dx: this.obstaclesSpeedPositionMap[random].dx,
+      speed: this.obstaclesSpeedPositionMap[random].speed,
+      dy: -height,
+      width: width,
+      height: height,
+    });
   }
 
   drawObstacles() {
@@ -131,8 +149,11 @@ export default class Racing {
       this.ctx.drawImage(image, dx, obstacle.dy);
 
       if (this.isCollision(this.obstacles[index], this.car)) {
-        alert('GAME OVER');
-        this.stopAnimation('gameover');
+        this.playing = false;
+        setTimeout(() => {
+          this.stopAnimation('gameover');
+        }, 2000);
+
         break;
       }
 
@@ -205,6 +226,106 @@ export default class Racing {
     // Draw the road texture at two positions
     ctx.drawImage(roadImage, 0, yPosition1, size.width, patternHeight);
     ctx.drawImage(roadImage, 0, yPosition2, size.width, patternHeight);
+    this.roadOffset += this.scrollSpeed;
+  }
+
+  drawMenu() {
+    this.ctx.fillStyle = 'yellow';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    let y = 40;
+    let modifier = 1;
+    this.menu = 'active';
+
+    const animateMenu = () => {
+      if (this.playing || this.carSelect) return;
+      // this.menu = 'active';
+      this.ctx.font = `${40 + y / 20}px Arial`;
+      y += modifier;
+
+      if (y > 50) {
+        modifier = -1;
+      } else if (y < -50) {
+        modifier = 1;
+      }
+
+      this.drawRoad();
+      this.drawCarList();
+      this.ctx.fillText(
+        'START GAME',
+        this.canvas.width / 2,
+        this.canvas.height / 2
+      );
+
+      //requestAnimationFrame(animateMenu);
+    };
+
+    if (!this.animationFrameId) {
+      this.animationFrameId = requestAnimationFrame(animateMenu);
+    }
+  }
+
+  startGame() {
+    this.carSelect = true;
+  }
+
+  async drawCarList() {
+    this.carList = [];
+    let pos = 0;
+    const carSpacing = 100;
+    const maxCars = 55;
+
+    for (let index = 0; index < maxCars; index++) {
+      const carSprite = await this.processCarSprite(this.carsCoords[index]);
+      this.carList.push(carSprite);
+    }
+
+    const animateList = () => {
+      if (this.playing) {
+        return;
+      }
+      if (this.drivingRight) {
+        pos += 3;
+      }
+      if (this.drivingLeft) {
+        pos -= 3;
+      }
+
+      if (pos > carSpacing) pos = 0;
+
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+      let currentPosition = pos;
+      this.drawRoad();
+      this.carList.forEach((car) => {
+        const { image, width, height } = car;
+        this.ctx.drawImage(image, currentPosition, this.canvas.height - height);
+        currentPosition += width + carSpacing;
+      });
+
+      this.animationFrameId = requestAnimationFrame(animateList);
+    };
+
+    this.canvas.addEventListener('click', (event) => {
+      const clickX = event.offsetX;
+      const clickY = event.offsetY;
+
+      let pos = 0;
+      this.carList.forEach((car, index) => {
+        const { width, height } = car;
+        if (
+          clickX >= pos &&
+          clickX <= pos + width &&
+          clickY >= this.canvas.height - height &&
+          clickY <= this.canvas.height
+        ) {
+          console.log(pos);
+          this.selectedCar = index;
+        }
+        pos += width + carSpacing;
+      });
+    });
+
+    this.animationFrameId = requestAnimationFrame(animateList);
   }
 
   drawCar() {
@@ -237,8 +358,6 @@ export default class Racing {
   }
 
   updateRoad() {
-    this.frameCount++;
-    this.roadOffset += this.scrollSpeed;
     this.drawRoad();
     this.drawCar();
     this.drawObstacles();
@@ -250,9 +369,10 @@ export default class Racing {
   }
 
   startAnimation(sensivity) {
+    this.menu = false;
     this.playing = true;
     this.setPlayState(true);
-    if (sensivity) {
+    if (sensivity >= 1) {
       this.sensivity = sensivity;
     }
 
@@ -277,8 +397,8 @@ export default class Racing {
   gameOver() {
     this.ctx.font = '50px Arial';
     this.ctx.fillStyle = 'red';
-    this.ctx.textAlign = 'center'; // Horizontal center
-    this.ctx.textBaseline = 'middle'; // Vertical center
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
     this.ctx.fillText(
       'GAME OVER',
       this.canvas.width / 2,
@@ -293,11 +413,18 @@ export default class Racing {
   }
 
   stopAnimation(gameover) {
+    if (this.menu) {
+      return;
+    }
     console.log('RESET');
+
     this.playing = false;
     this.setPlayState(false);
     if (this.animationFrameId) {
+      console.log('Animation Frame ID before cancel:', this.animationFrameId);
       cancelAnimationFrame(this.animationFrameId);
+      delete this.animationFrameId;
+      console.log('Animation Frame ID after cancel:', this.animationFrameId);
     }
     if (this.interval) {
       clearInterval(this.interval);

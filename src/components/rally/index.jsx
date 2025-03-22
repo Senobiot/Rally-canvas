@@ -23,8 +23,9 @@ export default function Rally() {
     canvasInstance.current.startAnimation(sensivity);
   };
 
-  const handleReset = () => {
+  const handleReset = (event) => {
     canvasInstance.current.stopAnimation();
+    event.target.blur();
   };
 
   const handleKeyDown = (event) => {
@@ -44,6 +45,10 @@ export default function Rally() {
       if (opposite) {
         canvas[opposite] = false;
       }
+    }
+    console.log(event.key);
+    if (event.key === 'Enter') {
+      !playState && canvas.startGame();
     }
   };
 
@@ -72,6 +77,7 @@ export default function Rally() {
         });
 
         canvasContainerRef.current.appendChild(canvasInstance.current.init());
+        canvasContainerRef.current.focus();
       };
       getSprites();
     }
@@ -104,9 +110,21 @@ export default function Rally() {
         >
           Start
         </button>
-        <button onClick={() => setSensivity(sensivity - 1)}>-</button>
+        <button
+          onClick={() =>
+            setSensivity(sensivity > 1 ? sensivity - 1 : sensivity)
+          }
+        >
+          -
+        </button>
         <span>Sensivity: {sensivity}</span>
-        <button onClick={() => setSensivity(sensivity + 1)}>+</button>
+        <button
+          onClick={() =>
+            setSensivity(sensivity < 4 ? sensivity + 1 : sensivity)
+          }
+        >
+          +
+        </button>
         <button onClick={handleReset} style={{ backgroundColor: '#ff000099' }}>
           Reset
         </button>
