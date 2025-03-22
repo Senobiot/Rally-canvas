@@ -18,6 +18,11 @@ export default class Racing {
     this.setScore = setScore;
     this.obstacles = [];
     this.obstaclesSpeed = 1;
+
+    // this.drivingLeft = false;
+    // this.drivingRight = false;
+    // this.drivingUp = false;
+    // this.drivingDown = false;
   }
 
   init() {
@@ -25,6 +30,25 @@ export default class Racing {
     this.canvas = document.createElement('canvas');
     this.canvas.width = this.size.width;
     this.canvas.height = this.size.height;
+
+    this.obstaclesSpeedPositionMap = {
+      1: {
+        dx: this.canvas.width / 4 - 50,
+        speed: this.obstaclesSpeed * 3,
+      },
+      2: {
+        dx: this.canvas.width / 2 - 80,
+        speed: this.obstaclesSpeed * 4,
+      },
+      3: {
+        dx: (this.canvas.width / 4) * 3 - 80,
+        speed: this.obstaclesSpeed * 0.5,
+      },
+      4: {
+        dx: this.canvas.width - 100,
+        speed: this.obstaclesSpeed,
+      },
+    };
 
     this.ctx = this.canvas.getContext('2d');
     this.initRoad();
@@ -50,35 +74,12 @@ export default class Racing {
     const randomCar = Math.floor(Math.random() * this.carsCoords.length);
     const currentCar = this.carsCoords[randomCar];
 
-    console.log(currentCar);
-    let xPosition;
-    let speed;
-    switch (random) {
-      case 4:
-        xPosition = this.canvas.width - 100;
-        speed = this.obstaclesSpeed;
-        break;
-      case 3:
-        xPosition = (this.canvas.width / 4) * 3 - 80;
-        speed = this.obstaclesSpeed * 0.5;
-        break;
-      case 2:
-        xPosition = this.canvas.width / 2 - 80;
-        speed = this.obstaclesSpeed * 4;
-        break;
-
-      default:
-        xPosition = this.canvas.width / 4 - 50;
-        speed = this.obstaclesSpeed * 3;
-        break;
-    }
-
     image.onload = () => {
       const tempCanvas = document.createElement('canvas');
       const tempCtx = tempCanvas.getContext('2d');
       const scaledWidth = currentCar.size.x * 2;
       const scaledHeight = currentCar.size.y * 2;
-
+      console.log(scaledHeight);
       tempCanvas.width = scaledWidth;
       tempCanvas.height = scaledHeight;
       tempCtx.save();
@@ -105,9 +106,9 @@ export default class Racing {
 
       this.obstacles.push({
         image: flippedSprite,
-        dx: xPosition,
-        speed,
-        dy: -69 * 2,
+        dx: this.obstaclesSpeedPositionMap[random].dx,
+        speed: this.obstaclesSpeedPositionMap[random].speed,
+        dy: -scaledHeight,
       });
     };
   }
@@ -139,7 +140,7 @@ export default class Racing {
 
   drawRoad() {
     const { ctx, roadImage, size, roadOffset } = this;
-    // Clear the canvas
+
     ctx.clearRect(0, 0, size.width, size.height);
 
     // Calculate two positions for seamless scrolling
@@ -154,6 +155,19 @@ export default class Racing {
 
   drawCar() {
     const { image, x, y, width, height, dx, dy } = this.car;
+
+    if (this.drivingUp) {
+      if (this.car.dy - 10 > this.canvas.height / 2) {
+        this.car.dy -= this.sensivity;
+      }
+    }
+
+    if (this.drivingDown) {
+      if (this.car.dy + 10 < this.canvas.height) {
+        this.car.dy += this.sensivity;
+      }
+    }
+
     if (this.drivingLeft) {
       if (this.car.dx - 10 > 10) {
         this.car.dx -= this.sensivity;
@@ -193,7 +207,7 @@ export default class Racing {
       this.initObstacle();
     }, 2000);
 
-    loop(); // Start the loop
+    loop();
   }
 
   stopAnimation() {
@@ -205,7 +219,9 @@ export default class Racing {
     }
     this.animationFrameId = null;
     this.ctx.clearRect(0, 0, this.size.width, this.size.height);
+
     this.obstacles = [];
     this.initRoad();
+    this.initCar();
   }
 }

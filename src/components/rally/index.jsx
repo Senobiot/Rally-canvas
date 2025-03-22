@@ -10,6 +10,13 @@ export default function Rally() {
   const canvasContainerRef = useRef(null);
   const canvasInstance = useRef(null);
 
+  const keyToProperty = {
+    ArrowLeft: 'drivingLeft',
+    ArrowRight: 'drivingRight',
+    ArrowUp: 'drivingUp',
+    ArrowDown: 'drivingDown',
+  };
+
   console.log('render');
 
   const handleStart = () => {
@@ -24,37 +31,30 @@ export default function Rally() {
   };
 
   const handleKeyDown = (event) => {
-    console.log('left');
     const { current: canvas } = canvasInstance;
-    const keyCode = event.keyCode || event.which;
-    const arrow = { left: 37, right: 39 };
+    const direction = keyToProperty[event.key];
+    const oppositeDirection = {
+      drivingLeft: 'drivingRight',
+      drivingRight: 'drivingLeft',
+      drivingUp: 'drivingDown',
+      drivingDown: 'drivingUp',
+    };
 
-    if (keyCode === arrow.left) {
-      if (!canvas.drivingLeft) {
-        canvas.drivingLeft = true;
-        canvas.drivingRight = false;
-      }
-    } else if (keyCode === arrow.right) {
-      if (!canvas.drivingRight) {
-        canvas.drivingLeft = false;
-        canvas.drivingRight = true;
+    if (direction) {
+      canvas[direction] = true;
+
+      const opposite = oppositeDirection[direction];
+      if (opposite) {
+        canvas[opposite] = false;
       }
     }
   };
 
   const handleKeyUp = (event) => {
     const { current: canvas } = canvasInstance;
-    const keyCode = event.keyCode || event.which;
-    const arrow = { left: 37, right: 39 };
-
-    if (keyCode === arrow.left) {
-      if (canvas.drivingLeft) {
-        canvas.drivingLeft = false;
-      }
-    } else if (keyCode === arrow.right) {
-      if (canvas.drivingRight) {
-        canvas.drivingRight = false;
-      }
+    const direction = keyToProperty[event.key];
+    if (direction) {
+      canvas[direction] = false;
     }
   };
 
