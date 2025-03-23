@@ -48,7 +48,14 @@ export default function Rally() {
     }
     console.log(event.key);
     if (event.key === 'Enter') {
-      !playState && canvas.startGame();
+      if (!canvas.playing) {
+        if (!canvas.carSelect) {
+          console.log(canvas);
+          canvas.startGame();
+        } else {
+          canvas.startAnimation(sensivity);
+        }
+      }
     }
   };
 

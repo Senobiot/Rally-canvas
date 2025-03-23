@@ -14,11 +14,11 @@ export const parseAtlas = (atlasContent) => {
         if (spriteName) {
           sprites.push(spriteContent);
           spriteName = line;
-          spriteContent = {};
+          spriteContent = { name: line };
           break;
         } else {
           spriteName = line;
-          spriteContent = {};
+          spriteContent = { name: line };
           break;
         }
       case 'xy':
