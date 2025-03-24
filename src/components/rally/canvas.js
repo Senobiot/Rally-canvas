@@ -5,7 +5,6 @@ export default class Racing {
     carsImgUrl,
     carsCoords,
     selectedCar,
-    setPlayState,
   }) {
     this.size = size;
     this.roadImgUrl = roadImgUrl;
@@ -13,13 +12,19 @@ export default class Racing {
     this.carsCoords = carsCoords;
     this.selectedCar = selectedCar;
     this.roadOffset = 0;
-    this.scrollSpeed = 2;
+    this.scrollSpeed = 4;
     this.sensivity = 1;
     this.obstacles = [];
-    this.obstaclesSpeed = 1;
-    this.setPlayState = setPlayState;
+    this.obstaclesSpeed = 2;
     this.carListPosition = 140;
     this.minCarListPosition = 140;
+    this.carList = [];
+    this.keyToProperty = {
+      ArrowLeft: 'drivingLeft',
+      ArrowRight: 'drivingRight',
+      ArrowUp: 'drivingUp',
+      ArrowDown: 'drivingDown',
+    };
 
     this.lastRenderTime = performance.now();
     this.thisDefaultFpsInterval = 1000 / 60;
@@ -31,8 +36,49 @@ export default class Racing {
     this.score = 0;
   }
 
-  init() {
+  handleKeyDown = (event) => {
+    const direction = this.keyToProperty[event.key];
+    const oppositeDirection = {
+      drivingLeft: 'drivingRight',
+      drivingRight: 'drivingLeft',
+      drivingUp: 'drivingDown',
+      drivingDown: 'drivingUp',
+    };
+
+    if (direction) {
+      this[direction] = true;
+      const opposite = oppositeDirection[direction];
+      if (opposite) {
+        this[opposite] = false;
+      }
+    }
+
+    if (event.key === 'Enter' && !this.playing) {
+      if (this.isGameOver) {
+        console.log(this.isGameOver);
+        this.isGameOver = false;
+        this.drawMenu();
+      }
+      this.startGame();
+    }
+  };
+
+  handleKeyUp = (event) => {
+    const direction = this.keyToProperty[event.key];
+    if (direction) {
+      this[direction] = false;
+    }
+  };
+
+  async init() {
     console.log('init');
+
+    for (let index = 0; index < this.carsCoords.length; index++) {
+      const carSprite = await this.processCarSprite(this.carsCoords[index]);
+      carSprite.name = this.carsCoords[index].name;
+      this.carList.push(carSprite);
+    }
+
     this.canvas = document.createElement('canvas');
     this.canvas.width = this.size.width;
     this.canvas.height = this.size.height;
@@ -222,34 +268,11 @@ export default class Racing {
     return elapsed > this.thisDefaultFpsInterval;
   }
 
-  async drawMenu() {
+  drawMenu() {
     console.log('drawMenu');
-    this.ctx.fillStyle = 'yellow';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    let y = 40;
-    let textSpeed = 3;
-    let modifier = textSpeed;
 
-    this.carList = [];
-    const maxCars = 55;
-
-    for (let index = 0; index < maxCars; index++) {
-      const carSprite = await this.processCarSprite(this.carsCoords[index]);
-      carSprite.name = this.carsCoords[index].name;
-      this.carList.push(carSprite);
-    }
-
-    let text = {
-      text: 'START GAME',
-      x: this.canvas.width / 2,
-      y: this.canvas.height / 2,
-      font: 40,
-      x1: 50,
-      x2: this.canvas.width - 50,
-      y1: this.canvas.height / 2 - 50,
-      y2: this.canvas.height / 2 + 50,
-    };
+    let tz = 0;
+    let modifier = 0.25;
 
     const animateMenu = (currentTime) => {
       if (this.playing) {
@@ -261,50 +284,26 @@ export default class Racing {
         this.drawRoad(currentTime);
 
         if (!this.selectingCar) {
-          this.ctx.font = `${text.font + y / 20}px Arial`;
-          y += modifier;
+          tz += modifier;
 
-          if (y > 50) {
-            modifier = -textSpeed;
-          } else if (y < -50) {
-            modifier = textSpeed;
+          if (tz > 5 || tz < -5) {
+            modifier = -modifier;
           }
 
-          this.ctx.fillText(text.text, text.x, text.y);
+          this.addText({ text: 'START GAME', fz: 40 + tz });
+          this.addText({
+            text: 'Press Enter',
+            color: 'yellow',
+            y: this.canvas.height / 2 + 100,
+          });
         } else {
           this.drawCarList();
         }
       }
     };
+    window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keyup', this.handleKeyUp);
 
-    const mouseHandler = (event, coord) => {
-      const clickX = event.offsetX;
-      const clickY = event.offsetY;
-      return (
-        clickX >= coord.x1 &&
-        clickX <= coord.x2 &&
-        clickY >= coord.y1 &&
-        clickY <= coord.y2
-      );
-    };
-
-    const clickHandler = (event) => {
-      if (mouseHandler(event, text)) {
-        this.selectingCar = true;
-        this.selectedCar;
-      }
-    };
-
-    const curorHandler = (event) => {
-      if (mouseHandler(event, text)) {
-        this.canvas.style.cursor = 'pointer';
-      } else {
-        this.canvas.style.cursor = 'initial';
-      }
-    };
-
-    this.canvas.addEventListener('click', clickHandler);
-    this.canvas.addEventListener('mousemove', curorHandler);
     this.animationFrameId = requestAnimationFrame(animateMenu);
   }
 
@@ -368,6 +367,7 @@ export default class Racing {
     fz = 30,
     color = 'white',
   }) {
+    this.ctx.textAlign = 'center';
     this.ctx.font = `${fz}px ${font}`;
     this.ctx.fillStyle = color;
     this.ctx.fillText(upperCase ? text.toUpperCase() : text, x, y);
@@ -443,7 +443,6 @@ export default class Racing {
 
   startAnimation(sensivity) {
     this.initCar();
-    this.setPlayState(true);
     if (sensivity >= 1) {
       this.sensivity = sensivity;
     }
@@ -479,13 +478,14 @@ export default class Racing {
     });
 
     this.score = 0;
+    this.selectingCar = false;
+    this.isGameOver = true;
   }
 
   stopAnimation(gameover) {
     console.log('RESET');
     this.time = 60;
     this.playing = false;
-    this.setPlayState(false);
     cancelAnimationFrame(this.animationFrameId);
     clearInterval(this.interval);
     clearInterval(this.timer);
@@ -498,6 +498,6 @@ export default class Racing {
     }
 
     this.score = 0;
-    this.initRoad(gameover);
+    this.initRoad();
   }
 }
