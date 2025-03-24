@@ -20,7 +20,7 @@ export default function Rally() {
 
   const handleStart = () => {
     canvasContainerRef.current.focus();
-    canvasInstance.current.startAnimation(sensivity);
+    canvasInstance.current.startGame();
   };
 
   const handleReset = (event) => {
@@ -46,16 +46,9 @@ export default function Rally() {
         canvas[opposite] = false;
       }
     }
-    console.log(event.key);
+
     if (event.key === 'Enter') {
-      if (!canvas.playing) {
-        if (!canvas.carSelect) {
-          console.log(canvas);
-          canvas.startGame();
-        } else {
-          canvas.startAnimation(sensivity);
-        }
-      }
+      canvas.startGame();
     }
   };
 
@@ -117,21 +110,21 @@ export default function Rally() {
         >
           Start
         </button>
-        <button
+        {/* <button
           onClick={() =>
             setSensivity(sensivity > 1 ? sensivity - 1 : sensivity)
           }
         >
           -
         </button>
-        <span>Sensivity: {sensivity}</span>
-        <button
+        <span>Sensivity: {sensivity}</span> */}
+        {/* <button
           onClick={() =>
             setSensivity(sensivity < 4 ? sensivity + 1 : sensivity)
           }
         >
           +
-        </button>
+        </button> */}
         <button onClick={handleReset} style={{ backgroundColor: '#ff000099' }}>
           Reset
         </button>
