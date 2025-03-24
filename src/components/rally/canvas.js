@@ -18,6 +18,17 @@ export default class Racing {
     this.obstacles = [];
     this.obstaclesSpeed = 1;
     this.setPlayState = setPlayState;
+    this.carListPosition = 140;
+    this.minCarListPosition = 140;
+
+    this.lastRenderTime = performance.now();
+    this.thisDefaultFpsInterval = 1000 / 60;
+
+    this.lastTime = performance.now();
+    this.frameCount = 0;
+    this.fps = 0;
+    this.time = 60;
+    this.score = 0;
   }
 
   init() {
@@ -45,28 +56,19 @@ export default class Racing {
       },
     };
 
-    this.ctx = this.canvas.getContext('2d');
-
+    this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
     this.initRoad();
-    // this.initCar();
 
     return this.canvas;
   }
 
-  initRoad(gameOver) {
-    this.frameCount = 0;
-    this.time = 60;
+  initRoad() {
     this.roadImage = new Image();
     this.roadImage.src = this.roadImgUrl;
 
     this.roadImage.onload = () => {
       console.log('ROAD LOADED');
-      // this.drawRoad();
-      if (gameOver) {
-        return this.gameOver();
-      }
       this.drawMenu();
-      this.score = 0;
     };
   }
   //need to combine with init own car
@@ -148,7 +150,7 @@ export default class Racing {
       obstacle.y += speed;
       this.ctx.drawImage(image, x, obstacle.y);
 
-      if (this.isCollision(this.obstacles[index], this.car)) {
+      if (this.isCollision(this.obstacles[index], this.selectedCar)) {
         this.playing = false;
         setTimeout(() => {
           this.stopAnimation('gameover');
@@ -165,55 +167,16 @@ export default class Racing {
     }
 
     this.obstacles = this.newObstacles;
-
-    // this.obstacles.forEach((car) => {
-    //   const { dx, image, speed } = car;
-    //   this.ctx.drawImage(image, dx, (car.dy += speed));
-    //   if (this.isCollision(car, this.car)) {
-    //     alert('GAME OVER');
-    //     this.stopAnimation();
-    //   }
-    // });
-
-    // this.obstacles = this.obstacles.filter((car) => {
-    //   if (car.dy > this.canvas.height) {
-    //     this.score += 100;
-    //     return false;
-    //   }
-
-    //   return true;
-    // });
   }
 
   //need to combine with initObstacle
   initCar() {
-    const { image, width, height } = this.selectedCar;
-    this.car = {
-      image,
-      width,
-      height,
-      x: this.canvas.width / 2 - width / 2,
-      y: this.canvas.height - height - 10,
-    };
-    // const { x, y, width, height } = this.selectedCar;
-    // const image = new Image();
-    // image.src = this.carsImgUrl;
-
-    // image.onload = () => {
-    //   this.car = {
-    //     x,
-    //     y,
-    //     width,
-    //     height,
-    //     image,
-    //     dx: this.canvas.width / 2 - width / 2,
-    //     dy: this.canvas.height - 10 - height,
-    //   };
-    // };
+    const { width, height } = this.selectedCar;
+    this.selectedCar.x = this.canvas.width / 2 - width / 2;
+    this.selectedCar.y = this.canvas.height - height - 10;
   }
 
   isCollision(rect1, rect2) {
-    // console.log(rect1, rect2);
     return (
       rect1.x < rect2.x + rect2.width &&
       rect1.x + rect1.width > rect2.x &&
@@ -222,184 +185,233 @@ export default class Racing {
     );
   }
 
-  drawRoad() {
+  drawFpsMeter(currentTime) {
+    this.frameCount++;
+    const elapsed = currentTime - this.lastTime;
+
+    if (elapsed >= 1000) {
+      this.fps = this.frameCount;
+      this.frameCount = 0;
+      this.lastTime = currentTime;
+    }
+
+    this.ctx.font = '16px Arial';
+    this.ctx.fillStyle = 'white';
+    this.ctx.fillText(`FPS: ${this.fps}`, this.canvas.width - 50, 20);
+  }
+
+  drawRoad(currentTime) {
     const { ctx, roadImage, size, roadOffset } = this;
 
     ctx.clearRect(0, 0, size.width, size.height);
 
-    // Calculate two positions for seamless scrolling
     const patternHeight = size.height;
     const yPosition1 = roadOffset % patternHeight;
     const yPosition2 = yPosition1 - patternHeight;
 
-    // Draw the road texture at two positions
     ctx.drawImage(roadImage, 0, yPosition1, size.width, patternHeight);
     ctx.drawImage(roadImage, 0, yPosition2, size.width, patternHeight);
     this.roadOffset += this.scrollSpeed;
+
+    this.drawFpsMeter(currentTime);
   }
 
-  drawMenu() {
+  limitFps(currentTime) {
+    const elapsed = currentTime - this.lastRenderTime;
+    this.lastRenderTime = currentTime - (elapsed % this.thisDefaultFpsInterval);
+    return elapsed > this.thisDefaultFpsInterval;
+  }
+
+  async drawMenu() {
+    console.log('drawMenu');
     this.ctx.fillStyle = 'yellow';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
     let y = 40;
-    let modifier = 1;
-    this.menu = 'active';
+    let textSpeed = 3;
+    let modifier = textSpeed;
 
-    const animateMenu = () => {
-      if (this.playing || this.carSelect) return;
-      // this.menu = 'active';
-      this.ctx.font = `${40 + y / 20}px Arial`;
-      y += modifier;
-
-      if (y > 50) {
-        modifier = -1;
-      } else if (y < -50) {
-        modifier = 1;
-      }
-
-      this.drawRoad();
-      this.ctx.fillText(
-        'START GAME',
-        this.canvas.width / 2,
-        this.canvas.height / 2
-      );
-
-      this.animationFrameId = requestAnimationFrame(animateMenu);
-    };
-
-    if (!this.animationFrameId) {
-      this.animationFrameId = requestAnimationFrame(animateMenu);
-    }
-  }
-
-  startGame() {
-    this.carSelect = true;
-    this.drawCarList();
-  }
-
-  async drawCarList() {
-    const padding = 10;
     this.carList = [];
-    let pos = 0;
-    const carSpacing = 100;
     const maxCars = 55;
+
     for (let index = 0; index < maxCars; index++) {
       const carSprite = await this.processCarSprite(this.carsCoords[index]);
       carSprite.name = this.carsCoords[index].name;
       this.carList.push(carSprite);
     }
 
-    const animateList = () => {
+    let text = {
+      text: 'START GAME',
+      x: this.canvas.width / 2,
+      y: this.canvas.height / 2,
+      font: 40,
+      x1: 50,
+      x2: this.canvas.width - 50,
+      y1: this.canvas.height / 2 - 50,
+      y2: this.canvas.height / 2 + 50,
+    };
+
+    const animateMenu = (currentTime) => {
       if (this.playing) {
         return;
       }
-      if (this.drivingRight) {
-        pos += 3;
-      }
-      if (this.drivingLeft) {
-        pos -= 3;
-      }
 
-      if (pos > carSpacing) pos = 0;
+      this.animationFrameId = requestAnimationFrame(animateMenu);
+      if (this.limitFps(currentTime)) {
+        this.drawRoad(currentTime);
 
-      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-      let currentPosition = pos;
-      this.drawRoad();
-      this.selectedCar = false;
-      this.carList.forEach((car) => {
-        const { image, width, height, name } = car;
+        if (!this.selectingCar) {
+          this.ctx.font = `${text.font + y / 20}px Arial`;
+          y += modifier;
 
-        if (
-          currentPosition < this.canvas.width / 2 + width / 2 &&
-          currentPosition > this.canvas.width / 2 - width / 2 - carSpacing / 2
-        ) {
-          this.ctx.font = `20px Arial`;
-          this.ctx.fillText(
-            `Selected car:`,
-            this.canvas.width / 2,
-            this.canvas.height - this.canvas.height / 2 - 40
-          );
-          this.ctx.fillText(
-            name,
-            this.canvas.width / 2,
-            this.canvas.height - this.canvas.height / 2
-          );
-          this.selectedCar = car;
+          if (y > 50) {
+            modifier = -textSpeed;
+          } else if (y < -50) {
+            modifier = textSpeed;
+          }
+
+          this.ctx.fillText(text.text, text.x, text.y);
+        } else {
+          this.drawCarList();
         }
-
-        this.ctx.drawImage(
-          image,
-          currentPosition,
-          this.canvas.height - height - padding
-        );
-
-        currentPosition += width + carSpacing;
-      });
-
-      if (!this.selectedCar) {
-        this.ctx.font = `20px Arial`;
-        this.ctx.fillText(
-          `Select your car`,
-          this.canvas.width / 2,
-          this.canvas.height - this.canvas.height / 2 - 40
-        );
       }
-
-      this.animationFrameId = requestAnimationFrame(animateList);
     };
 
-    // this.canvas.addEventListener('click', (event) => {
-    //   const clickX = event.offsetX;
-    //   const clickY = event.offsetY;
+    const mouseHandler = (event, coord) => {
+      const clickX = event.offsetX;
+      const clickY = event.offsetY;
+      return (
+        clickX >= coord.x1 &&
+        clickX <= coord.x2 &&
+        clickY >= coord.y1 &&
+        clickY <= coord.y2
+      );
+    };
 
-    //   let pos = 0;
-    //   this.carList.forEach((car, index) => {
-    //     const { width, height } = car;
-    //     if (
-    //       clickX >= pos &&
-    //       clickX <= pos + width &&
-    //       clickY >= this.canvas.height - height &&
-    //       clickY <= this.canvas.height
-    //     ) {
-    //       console.log(pos);
-    //       this.selectedCar = index;
-    //     }
-    //     pos += width + carSpacing;
-    //   });
-    // });
+    const clickHandler = (event) => {
+      if (mouseHandler(event, text)) {
+        this.selectingCar = true;
+        this.selectedCar;
+      }
+    };
 
-    this.animationFrameId = requestAnimationFrame(animateList);
+    const curorHandler = (event) => {
+      if (mouseHandler(event, text)) {
+        this.canvas.style.cursor = 'pointer';
+      } else {
+        this.canvas.style.cursor = 'initial';
+      }
+    };
+
+    this.canvas.addEventListener('click', clickHandler);
+    this.canvas.addEventListener('mousemove', curorHandler);
+    this.animationFrameId = requestAnimationFrame(animateMenu);
+  }
+
+  drawCarList() {
+    if (this.playing) {
+      return;
+    }
+    if (!this.drivingRight && !this.drivingLeft && this.lastRenderedSection) {
+      this.ctx.putImageData(this.lastRenderedSection, 0, 0);
+      return;
+    }
+    if (this.drivingRight) {
+      this.carListPosition -= 3;
+    }
+    if (this.drivingLeft) {
+      if (this.minCarListPosition >= this.carListPosition) {
+        this.carListPosition += 3;
+      }
+    }
+
+    let currentPosition = this.carListPosition;
+
+    for (let index = 0; index < this.carList.length; index++) {
+      if (currentPosition >= this.canvas.width) {
+        break;
+      }
+
+      const width = this.carList[index].width;
+      if (currentPosition + width <= 0) {
+        currentPosition += width + 50;
+        continue;
+      }
+
+      const { image, height, name } = this.carList[index];
+
+      this.ctx.drawImage(
+        image,
+        currentPosition,
+        this.canvas.height - height - 10
+      );
+
+      if (
+        currentPosition < this.canvas.width / 2 + width / 2 + 50 / 2 &&
+        currentPosition > this.canvas.width / 2 - width / 2 - 50 / 4
+      ) {
+        this.selectedCar = { image, width, height };
+
+        this.addText({ text: 'Selected car:', y: this.canvas.height / 2 - 50 });
+        this.addText({ text: name, upperCase: true, color: 'yellow', fz: 40 });
+      }
+      currentPosition += width + 50;
+    }
+  }
+
+  addText({
+    text,
+    upperCase,
+    y = this.canvas.height / 2,
+    x = this.canvas.width / 2,
+    font = 'Arial',
+    fz = 30,
+    color = 'white',
+  }) {
+    this.ctx.font = `${fz}px ${font}`;
+    this.ctx.fillStyle = color;
+    this.ctx.fillText(upperCase ? text.toUpperCase() : text, x, y);
   }
 
   drawCar() {
-    const { image, x, y } = this.car;
-
     if (this.drivingUp) {
-      if (this.car.y - 10 > this.canvas.height / 2) {
-        this.car.y -= this.sensivity;
+      if (
+        this.selectedCar.y + this.selectedCar.height / 2 >
+        this.canvas.height / 2
+      ) {
+        this.selectedCar.y -= this.sensivity;
       }
     }
 
     if (this.drivingDown) {
-      if (this.car.y + 10 < this.canvas.height) {
-        this.car.y += this.sensivity;
+      if (
+        this.selectedCar.y + this.selectedCar.height + 10 <
+        this.canvas.height
+      ) {
+        this.selectedCar.y += this.sensivity;
       }
     }
 
     if (this.drivingLeft) {
-      if (this.car.x - 10 > 10) {
-        this.car.x -= this.sensivity;
+      if (this.selectedCar.x - 10 > 10) {
+        this.selectedCar.x -= this.sensivity;
       }
     }
 
     if (this.drivingRight) {
-      if (this.car.x + this.car.width + 10 < this.canvas.width) {
-        this.car.x += this.sensivity;
+      if (
+        this.selectedCar.x + this.selectedCar.width + 10 <
+        this.canvas.width
+      ) {
+        this.selectedCar.x += this.sensivity;
       }
     }
-    // console.log(this.car);
-    this.ctx.drawImage(image, x, y);
+
+    this.ctx.drawImage(
+      this.selectedCar.image,
+      this.selectedCar.x,
+      this.selectedCar.y
+    );
   }
 
   updateRoad() {
@@ -413,20 +425,34 @@ export default class Racing {
     this.ctx.fillText(`Time: ${this.time}`, 50, 100);
   }
 
+  startGame() {
+    if (this.playing) {
+      return;
+    }
+
+    if (!this.selectingCar) {
+      this.selectingCar = true;
+      return;
+    }
+
+    if (this.selectingCar) {
+      this.playing = true;
+      this.startAnimation();
+    }
+  }
+
   startAnimation(sensivity) {
-    this.menu = false;
-    this.playing = true;
-    this.carSelect = false;
     this.initCar();
     this.setPlayState(true);
     if (sensivity >= 1) {
       this.sensivity = sensivity;
     }
 
-    const loop = () => {
-      if (this.playing) {
+    const loop = (currentTime) => {
+      if (!this.playing) return;
+      this.animationFrameId = requestAnimationFrame(loop);
+      if (this.limitFps(currentTime)) {
         this.updateRoad();
-        this.animationFrameId = requestAnimationFrame(loop);
       }
     };
 
@@ -435,6 +461,9 @@ export default class Racing {
     }, 2000);
 
     this.timer = setInterval(() => {
+      if (this.time <= 0) {
+        return this.stopAnimation('gameover');
+      }
       this.time--;
     }, 1000);
 
@@ -442,48 +471,33 @@ export default class Racing {
   }
 
   gameOver() {
-    this.ctx.font = '50px Arial';
-    this.ctx.fillStyle = 'red';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(
-      'GAME OVER',
-      this.canvas.width / 2,
-      this.canvas.height / 2
-    );
-    this.ctx.fillStyle = 'white';
-    this.ctx.fillText(
-      `Score: ${this.score}`,
-      this.canvas.width / 2,
-      this.canvas.height / 2 + 100
-    );
+    this.addText({ fz: 50, color: 'red', text: 'GAME OVER' });
+    this.addText({
+      fz: 40,
+      text: `Score: ${this.score}`,
+      y: this.canvas.height / 2 + 100,
+    });
+
+    this.score = 0;
   }
 
   stopAnimation(gameover) {
-    if (this.menu) {
-      return;
-    }
     console.log('RESET');
-
+    this.time = 60;
     this.playing = false;
     this.setPlayState(false);
-    if (this.animationFrameId) {
-      console.log('Animation Frame ID before cancel:', this.animationFrameId);
-      cancelAnimationFrame(this.animationFrameId);
-      delete this.animationFrameId;
-      console.log('Animation Frame ID after cancel:', this.animationFrameId);
-    }
-    if (this.interval) {
-      clearInterval(this.interval);
-    }
-    if (this.timer) {
-      clearInterval(this.timer);
-    }
+    cancelAnimationFrame(this.animationFrameId);
+    clearInterval(this.interval);
+    clearInterval(this.timer);
     this.animationFrameId = null;
     this.ctx.clearRect(0, 0, this.size.width, this.size.height);
 
     this.obstacles = [];
+    if (gameover) {
+      return this.gameOver();
+    }
+
+    this.score = 0;
     this.initRoad(gameover);
-    // this.initCar();
   }
 }
